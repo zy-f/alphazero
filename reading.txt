@@ -1,0 +1,7 @@
+REINFORCEMENT LEARNING RESOURCES
+- reinforcement learning math: https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html
+- alphazero connect4: https://towardsdatascience.com/from-scratch-implementation-of-alphazero-for-connect4-f73d4554002a 
+- original alphazero: https://science.sciencemag.org/content/362/6419/1140 
+    - see also: https://science.sciencemag.org/content/suppl/2018/12/05/362.6419.1140.DC1?_ga=2.122730123.1457848798.1580339939-1725263943.1580166665
+- original alphaGo zero: https://www.nature.com/articles/nature24270
+- alphazero implementation from Stanford: https://github.com/suragnair/alpha-zero-general
