@@ -1,6 +1,7 @@
 import mcts
 import network
 import torch
+import numpy as np
 from utils import *
 
 class Storage(object):
@@ -10,8 +11,8 @@ class Storage(object):
         self.board_cls = game_class
         self.n_networks = 0
         self.networks = []
-        self.games = []
-        self.game_buffer_len = buffer_len
+        self.dataset = []
+        self.dataset_buffer_len = buffer_len
     
     def latest_network(self):
         net = network.Network(self.net_config)
@@ -29,15 +30,18 @@ class Storage(object):
         else:
             self.networks = networks[1:]+[filename]
     
-    def save_games(self, dataset):
-        removable_game_idxs = max(0, len(self.games)+len(dataset)-self.game_buffer_len)
-        self.games = self.games[removable_game_idxs:] + dataset
+    def save_sub_dataset(self, dataset):
+        removable_idxs = max(0, len(self.dataset)+len(dataset)-self.dataset_buffer_len)
+        self.dataset = self.dataset[removable_idxs:] + dataset
     
     def get_batches(self):
-        for _ in range(self.net_config.n_batches):
-            data = np.random.choice(np.array(self.games), size=self.net_config.bsz)
-            inp = torch.from_numpy(data[:,0])
-            pi = torch.from_numpy(data[:,1])
-            z = torch.from_numpy(data[:,2])
+        data_idxs = np.array(range(len(self.dataset)))
+        np.random.shuffle(data_idxs)
+
+        boards, policies, values = map(np.array, list(zip(*self.dataset)))
+        bsz = self.net_config.bsz
+        for k in range( (len(self.dataset)//bsz)-1 ):
+            inp, pi, z = ( np.take(x, data_idxs[k*bsz:(k+1)*bsz], axis=0) for x in (boards, policies, values) )
+            inp, pi, z = map(torch.from_numpy, (inp,pi,z))
             yield {'inputs':inp, 'pis':pi, 'zs':z}
         return

@@ -68,15 +68,15 @@ class PolicyHead(nn.Module):
     corresponding to logit probabilities for all [moves]" (AlphaGo supplement)
     in this case, pass is not a legal move, and the board is 3x3, so the output layer is size 9
     """
-    def __init__(self, legal_moves=9, board_size=9, in_filters=32):
+    def __init__(self, action_space=9, board_size=9, in_filters=32):
         super(PolicyHead, self).__init__()
         self.board_size = board_size # 1d "length" of board size
         
         self.conv1 = nn.Conv2d(in_filters, 2, kernel_size=1)
         self.bn1 = nn.BatchNorm2d(2)
         # relu
-        self.fc1 = nn.Linear(self.board_size*2, legal_moves)
-        self.softmax = nn.LogSoftmax(dim=1)
+        self.fc1 = nn.Linear(self.board_size*2, action_space)
+        self.softmax = nn.LogSoftmax(dim=-1)
     
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
@@ -123,17 +123,17 @@ class AlphaNet(nn.Module):
     computing the policy and value." (AlphaGo supplement)
     Again, probably don't need 19 res blocks for tictactoe. Will experiment
     """
-    def __init__(self, n_filters=0, n_hidden=0, n_res=0):
+    def __init__(self, board_layers=0, board_size=0, action_space=0, n_filters=0, n_hidden=0, n_res=0):
         super(AlphaNet, self).__init__()
-        self.conv_block1 = ConvBlock(out_filters=n_filters)
+        self.conv_block1 = ConvBlock(board_layers=board_layers, out_filters=n_filters)
         
         self.n_res = n_res
         for k in range(n_res):
             setattr(self, f"res_block{k+1}", ResBlock(in_filters=n_filters, out_filters=n_filters))
         
-        self.policy_head = PolicyHead(in_filters=n_filters)
+        self.policy_head = PolicyHead(action_space=action_space, board_size=board_size, in_filters=n_filters)
         
-        self.value_head = ValueHead(in_filters=n_filters, hidden_dims=n_hidden)
+        self.value_head = ValueHead(board_size=board_size, in_filters=n_filters, hidden_dims=n_hidden)
     
     def forward(self, x):
         x = self.conv_block1(x)
@@ -158,7 +158,7 @@ class AlphaLoss(nn.Module):
     """
     def forward(self, pi, p, z, v):
         v_err = (z - v)**2 # mean squared error
-        p_err = torch.sum(pi*(1e-8 + p.float()).float().log())
+        p_err = torch.sum(pi*p)
         loss = (v_err.view(-1) - p_err).mean()
         # missing the weight regularization, maybe not needed for t3
         return loss

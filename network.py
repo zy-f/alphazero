@@ -1,7 +1,9 @@
 import torch
-from tqdm import tqdm
+import torch.nn.functional as F
+from tqdm import tqdm, trange
 import storage
 from alphaNet import *
+import numpy as np
 
 class Network(object):
     def __init__(self, net_config):
@@ -18,32 +20,37 @@ class Network(object):
     
     # runs 1 epoch of training
     def train_epochs(self, storage):
-        if len(storage.games) < bsz*n_batches:
+        if len(storage.dataset) < storage.net_config.bsz:
             return
         self.train()
-        for _ in tqdm(self.epochs):
+        print("Training Neural Net:")
+        for epoch in range(self.epochs):
             sum_loss = 0.0
             iters = 0
-            for batch in tqdm(storage.get_batches()):
+            for batch in storage.get_batches(): #desc=f'Training Epoch {epoch+1}/{self.epochs}'
                 inp, pi, z = batch['inputs'], batch['pis'], batch['zs']
                 p, v = self.net(inp)
                 loss_size = self.loss_func(pi, p, z, v)
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 loss_size.backward()
-                optimizer.step()
+                self.optimizer.step()
                 
                 sum_loss += loss_size.item()
                 iters += 1
-            print(f"LOSS={sum_loss/iters}")
+            if (epoch+1) % (max(1,self.epochs//10)) == 0:
+                print(f"EPOCH={epoch+1}/{self.epochs}, LOSS={sum_loss/iters}")
+
+    def predict(self, inp):
+        self.eval()
+        inp = torch.from_numpy(inp)
+        p, v = self.net(inp)
+        v = v.detach().numpy().squeeze()
+        p = p.detach().exp().numpy().squeeze()
+        pi = {k:p[k] for k in range(len(p))}
+        return pi, v
     
     def train(self):
         self.net.train()
 
     def eval(self):
         self.net.eval()
-
-    def predict(self, inp):
-        inp = torch.from_numpy(inp)
-        p, v = self.net(inp)
-        policy = {(k//3,k%3):p[k] for k in range(len(p))}
-        return policy, v
