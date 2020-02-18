@@ -16,7 +16,7 @@ class Network(object):
             self.loss_func = net_config.loss_cls().eval()
         except:
             pass
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=net_config.optim_lr)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=net_config.optim_lr, weight_decay=net_config.weight_decay)
     
     # runs 1 epoch of training
     def train_epochs(self, storage):

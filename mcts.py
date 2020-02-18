@@ -131,7 +131,9 @@ def self_play(storage):
         if v**2 < 1:
             v_arr = [.5]*len(pi_arr) 
         else:
-            v_arr = [(-1)**(k%2) for k in range(len(pi_arr))]
+            v_arr = np.array( [(-1)**(k%2) for k in range(len(pi_arr))] )
+            if v == -1:
+                v_arr = -v_arr 
         dataset += list(zip(s_arr, pi_arr, v_arr))
     storage.save_sub_dataset(dataset)
 

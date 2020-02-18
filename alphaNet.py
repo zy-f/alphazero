@@ -140,7 +140,7 @@ class AlphaNet(nn.Module):
         for k in range(self.n_res):
             x = getattr(self, f"res_block{k+1}")(x)
         p = self.policy_head(x)
-        v = self.value_head(x)
+        v = self.value_head(x).squeeze(-1)
         return p,v
     
     def load_weights(self, weights_filepath):
@@ -158,7 +158,7 @@ class AlphaLoss(nn.Module):
     """
     def forward(self, pi, p, z, v):
         v_err = (z - v)**2 # mean squared error
-        p_err = torch.sum(pi*p)
+        p_err = torch.sum(pi*p, dim=-1)
         loss = (v_err.view(-1) - p_err).mean()
         # missing the weight regularization, maybe not needed for t3
         return loss

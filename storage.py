@@ -40,7 +40,7 @@ class Storage(object):
 
         boards, policies, values = map(np.array, list(zip(*self.dataset)))
         bsz = self.net_config.bsz
-        for k in range( (len(self.dataset)//bsz)-1 ):
+        for k in range( (len(self.dataset)//bsz) ):
             inp, pi, z = ( np.take(x, data_idxs[k*bsz:(k+1)*bsz], axis=0) for x in (boards, policies, values) )
             inp, pi, z = map(torch.from_numpy, (inp,pi,z))
             yield {'inputs':inp, 'pis':pi, 'zs':z}

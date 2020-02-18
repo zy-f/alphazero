@@ -23,9 +23,10 @@ class AlphaZero:
                 'net_params': net_params, 
                 'loss_cls': alphaNet.AlphaLoss, 
                 'optim_lr': 1e-3,
+                'weight_decay': .1,
                 'weights_filepath': None,
                 'n_epochs': 5,
-                'bsz': 32
+                'bsz': 64
         }
 
         mcts_kwargs = {
