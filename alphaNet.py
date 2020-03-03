@@ -17,9 +17,9 @@ class ConvBlock(nn.Module):
     (3) A rectifier nonlinearity" (AlphaGo supplement)
     256 filters has been changed to a lower number simply because tictactoe is way simpler than Go"
     """
-    def __init__(self, board_layers=3, out_filters=32):
+    def __init__(self, in_filters=3, out_filters=32):
         super(ConvBlock,self).__init__()
-        self.conv1 = nn.Conv2d(board_layers, out_filters, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_filters, out_filters, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(out_filters)
         # relu
     
@@ -104,15 +104,17 @@ class ValueHead(nn.Module):
         self.bn1 = nn.BatchNorm2d(1)
         # relu
         self.fc1 = nn.Linear(self.board_size*1, hidden_dims)
+        self.dropout1 = nn.Dropout(.3)
         # relu
         self.fc2 = nn.Linear(hidden_dims, 1)
+        self.dropout2 = nn.Dropout(.3)
         # tanh
     
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
         x = x.view(-1, self.board_size*1)
-        x = F.relu(self.fc1(x))
-        x = torch.tanh(self.fc2(x))
+        x = self.dropout1(F.relu(self.fc1(x)))
+        x = self.dropout2(torch.tanh(self.fc2(x)))
         return x
 
 class AlphaNet(nn.Module):
@@ -125,7 +127,7 @@ class AlphaNet(nn.Module):
     """
     def __init__(self, board_layers=0, board_size=0, action_space=0, n_filters=0, n_hidden=0, n_res=0):
         super(AlphaNet, self).__init__()
-        self.conv_block1 = ConvBlock(board_layers=board_layers, out_filters=n_filters)
+        self.conv_block1 = ConvBlock(in_filters=board_layers, out_filters=n_filters)
         
         self.n_res = n_res
         for k in range(n_res):
@@ -145,6 +147,48 @@ class AlphaNet(nn.Module):
     
     def load_weights(self, weights_filepath):
         self.load_state_dict(torch.load(weights_filepath))
+
+class NoResAlphaNet(nn.Module):
+    def __init__(self, board_layers=0, board_size=0, action_space=0, n_filters=0, n_hidden=0, n_conv=0):
+        super(NoResAlphaNet, self).__init__()
+        
+        self.n_conv = n_conv
+        for k in range(self.n_conv):
+            setattr(self, f"conv_block{k+1}", ConvBlock(in_filters=(board_layers if k==0 else n_filters), out_filters=n_filters))
+
+        self.conv_out = n_filters*9 # TIC TAC TOE ONLY
+        self.fc1 = nn.Linear(self.conv_out, n_hidden)
+        self.dropout1 = nn.Dropout(.3)
+        # relu
+
+        self.fc2 = nn.Linear(n_hidden, n_hidden//2)
+        self.dropout2 = nn.Dropout(.3)
+        # relu
+
+        self.policy_head = nn.Linear(n_hidden//2, action_space)
+        self.softmax = nn.LogSoftmax(dim=-1)
+
+        self.value_head = nn.Linear(n_hidden//2, 1)
+        # tanh
+    
+    def forward(self, x):
+        for k in range(self.n_conv):
+            x = getattr(self, f"conv_block{k+1}")(x)
+
+        x = x.view(-1, self.conv_out)
+        x = F.relu(self.dropout1(self.fc1(x)))
+        x = F.relu(self.dropout2(self.fc2(x)))
+
+        p = self.policy_head(x)
+        p = self.softmax(p)
+
+        v = self.value_head(x).squeeze(-1)
+        v = torch.tanh(v)
+        return p,v
+    
+    def load_weights(self, weights_filepath):
+        self.load_state_dict(torch.load(weights_filepath))
+        
 
 class AlphaLoss(nn.Module):
     def __init__(self):

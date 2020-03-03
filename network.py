@@ -12,11 +12,11 @@ class Network(object):
         if net_config.weights_filepath is not None:
             self.net.load_weights(net_config.weights_filepath)
         self.loss_func = net_config.loss_cls()
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=net_config.optim_lr, weight_decay=net_config.weight_decay)
         try:
             self.loss_func = net_config.loss_cls().eval()
         except:
             pass
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=net_config.optim_lr, weight_decay=net_config.weight_decay)
     
     # runs 1 epoch of training
     def train_epochs(self, storage):
@@ -46,11 +46,14 @@ class Network(object):
         p, v = self.net(inp)
         v = v.detach().numpy().squeeze()
         p = p.detach().exp().numpy().squeeze()
-        pi = {k:p[k] for k in range(len(p))}
-        return pi, v
+        # print("PRED_V="+str(v))
+        return p, v
     
     def train(self):
         self.net.train()
 
     def eval(self):
         self.net.eval()
+    
+    def __str__(self):
+        return str(self.net)

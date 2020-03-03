@@ -4,7 +4,7 @@ from copy import deepcopy
 class Board(object):
     def __init__(self, history):
         self.history = history or []
-        self.player = [1,-1][len(history)%2] if history else 1
+        self.player = [1,-1][len(history)%2] if history is not None else 1
         self.board = None
 
     def play(self, action):
@@ -34,7 +34,7 @@ class Board(object):
 class T3Board(Board):
     action_space = 9
     board_size = 9
-    encoding_layers = 3
+    encoding_layers = 1
 
     def __init__(self, history=None, board=None):
         super(T3Board,self).__init__(history)
@@ -66,8 +66,8 @@ class T3Board(Board):
 
         # draw checking
         if not (self.board == 0).any():
-            return 0.5
-        return 0
+            return 0
+        return None
 
     """
     "The M feature planes are composed of binary feature planes indicating the presence of the player’s pieces, 
@@ -81,34 +81,41 @@ class T3Board(Board):
     is "fully observable soley from the current [board state]" (AlphaGo supplement)
     """
     def encoded(self):
-        encoded = np.zeros((3,3,3), dtype=np.float32)
+        encoded = np.zeros((self.__class__.encoding_layers,3,3), dtype=np.float32)
         # M planes
-        encoded[:,:,0] = (self.board==1) # O's
-        encoded[:,:,1] = (self.board==-1) # X's
+        # encoded[:,:,0] = (self.board==1) # O's
+        # encoded[:,:,1] = (self.board==-1) # X's
+        
+        # encoded[0,:,:] = (self.board == self.player)
+        # encoded[1,:,:] = (self.board == -self.player)
+        
+        encoded[0,:,:] = self.board*self.player
 
         # L planes
-        encoded[:,:,2] = self.player # current player (L1)
+        # encoded[2,:,:] = self.player # current player (L1)
         return encoded
-
-    def legal_actions(self):
-        x,y = np.where(self.board == 0)
-        actions = list(zip(list(x),list(y)))
-        return actions
-
-    def actions_to_idxs(self, actions):
-        mapping = {}
-        for action in actions:
-            mapping[action] = action[0] * 3+action[1]
-        return mapping
     
-    def idxs_to_actions(self, idxs):
-        mapping = {}
-        for idx in idxs:
-            mapping[idx] = (idx//3, idx%3) 
+    def rotations(self, pi):
+        board = self.encoded()
+        pi = pi.reshape(3,3)
+        stack = np.insert(board,1,pi,axis=0)
+        out = []
+        stack_to_tuple = lambda arr: (arr[:-1], arr[-1].reshape(-1))
+        for k in range(4):
+            stack = np.rot90(stack, k=k, axes=(-1,-2))
+            out += [stack_to_tuple(stack), stack_to_tuple(np.fliplr(stack))]
+        return out
+
+    # returns a boolean array of length action_space
+    def legal_actions(self):
+        return self.board.reshape(-1) == 0
+    
+    def idx_action_map(self):
+        mapping = [(k//3, k%3) for k in range(self.__class__.action_space)]
         return mapping
 
     def clone(self):
-        return T3Board(history=self.history, board=np.copy(self.board))
+        return T3Board(history=list(self.history), board=np.copy(self.board))
 
     def __str__(self):
         str_player = ['X','O'][int(self.player/2+.5)]
@@ -116,7 +123,7 @@ class T3Board(Board):
         str_board = '\n'.join(['|'.join(str_board[k]) for k in range(len(str_board))])
         str_board = str_board.replace('-1','X').replace('1','O').replace('0',' ')
         is_won = self.end_state()
-        if is_won == 0:
+        if is_won is None:
             return f"\n{str_board}\n{str_player}'s turn"
         out_state_string = ['Draw','Player O Wins','Player X Wins'][int(is_won)]
         return f"\n{str_board}\n{out_state_string}"

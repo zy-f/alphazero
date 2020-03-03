@@ -18,7 +18,7 @@ class Storage(object):
         net = network.Network(self.net_config)
         if len(self.networks) > 0:
             self.net_config.weights_filepath = self.networks[-1]
-            net.load_state_dict(torch.load(self.net_config.weights_filepath))
+            net.net.load_state_dict(torch.load(self.net_config.weights_filepath))
         return net
     
     def save_network(self, network):
@@ -28,11 +28,13 @@ class Storage(object):
         if len(self.networks) < 5:
             self.networks.append(filename)
         else:
-            self.networks = networks[1:]+[filename]
+            self.networks = self.networks[1:]+[filename]
+        print(f'Saved networks: {self.n_networks}')
     
     def save_sub_dataset(self, dataset):
         removable_idxs = max(0, len(self.dataset)+len(dataset)-self.dataset_buffer_len)
         self.dataset = self.dataset[removable_idxs:] + dataset
+        print(f'Current dataset length: {len(self.dataset)}')
     
     def get_batches(self):
         data_idxs = np.array(range(len(self.dataset)))

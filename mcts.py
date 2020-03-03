@@ -17,37 +17,43 @@ class Node(object):
         self.q = 0
         self.parent = parent
         self.action = action
-        self.children = {}
+        self.children = []
         self.is_expanded = False
     
-    def expand(self, action_dict):
-        for action, p in action_dict.items():
-            self.children[action] = Node(p=p, parent=self, action=action)
+    def expand(self, node_params):
+        for p, action in node_params:
+            # print(f"action={action}, p={p}")
+            self.children.append( Node(p=p, parent=self, action=action) ) 
         self.is_expanded = True
     
     def update(self, value):
         self.n += 1
         self.w += value
         self.q = self.w/self.n
+    
+    def __str__(self):
+        return f"action={self.action}, p={self.p}, q={self.q}, n={self.n}, w={self.w}"
 
 def select_child(node, c_puct=1):
         # print(node.children)
-        actions, N, Q, P = zip(*[ [child.action, child.n, child.q, child.p] for child in node.children.values() ])
-        N, Q, P = map(np.array, (N,Q,P))
+        N, Q, P = map( np.array, zip(*[ [child.n, child.q, child.p] for child in node.children ]) )
+        # print(P)
         U = c_puct * P * np.sqrt(np.sum(N)) / (1+N)
-        best_action = actions[np.argmax(Q+U)]
-        return node.children[best_action]
+        # print(f"Q={Q}\nU={U}\nQ+U={Q+U}")
+        return node.children[np.argmax(Q+U)]
 
 def select_leaf(root, c_puct):
     node = root
     search_path = [root]
     while node.is_expanded:
-        node = select_child(node, c_puct=1)
+        node = select_child(node, c_puct=c_puct)
+        # print(node)
         search_path.append(node)
     return search_path
 
 def evaluate(network, board):
     # NEED TO DO BOARD ROTATIONS N STUFF SOMEWHERE
+    network.eval()
     encoded = board.encoded()
     encoded = np.expand_dims(encoded, axis=0)
     pi, v = network.predict(encoded)
@@ -57,45 +63,68 @@ def backup(leaf, v):
     node = leaf
     while node.parent is not None:
         node.update(v)
+        # print(node)
         v *= -1
         node = node.parent
     # root
     node.update(v)
 
 def add_dirichlet_noise(root):
-    child_ps = [ [action, child.p] for action, child in root.children.items()]
-    noise_distrib = np.random.gamma(.03, 1, len(root.children))
-    for k in range(len(child_ps)):
-        child_ps[k][1] = .75*child_ps[k][1] + .25*noise_distrib[k]
-    for action, child_p in child_ps:
-        root.children[action].p = child_p
+    child_ps = np.array([child.p for child in root.children])
+    noise_distrib = np.random.gamma(.1, 1, len(root.children))
+    child_ps = .75*child_ps + .25*noise_distrib
+    for k, child_p in enumerate(child_ps):
+        root.children[k].p = child_p
     return root
 
-def search(board, network, n_sim=100, c_puct=1, learning=True):
-    network.eval()
+def search(board, network, n_sim=100, c_puct=1, add_noise=True):
     root = Node()
+    default_prob = board.legal_actions().astype(float)
+    default_prob /= np.sum(default_prob)
+    default = zip(default_prob, board.idx_action_map())
+    root.expand(default)
+    if add_noise:
+        root = add_dirichlet_noise(root)
+    # print(np.array([child.p for child in root.children]))
+    
     for _ in range(n_sim):
-        if root.is_expanded and learning:
-            root = add_dirichlet_noise(root)
+        temp_board = board.clone()
+        # print("SELECT")
         search_path = select_leaf(root, c_puct) # select
         leaf = search_path[-1]
         for node in search_path[1:]:
-            board.play(node.action)
-        pi, v = evaluate(network, board) # evaluate
-        legal_actions = board.legal_actions()
-        legal_action_idxs = board.actions_to_idxs(legal_actions)
-        action_dict = {a:pi[ legal_action_idxs[a] ] for a in legal_actions}
-        if len(action_dict) > 0:
-            leaf.expand(action_dict)
-        backup(leaf, v)
+            temp_board.play(node.action)
+        # print(temp_board)
+        # print("EVAL")
+        pi, v = evaluate(network, temp_board) # evaluate
+
+        action_ps = pi * temp_board.legal_actions()
+        if sum(action_ps) > 0:
+            action_ps /= sum(action_ps)
+            node_params = list(zip(action_ps, board.idx_action_map()))
+            leaf.expand(node_params) # expand
+            backup(leaf, -v) # backup
+        else:
+            z = temp_board.end_state()
+            # if temp_board.player != board.player:
+            #     z = -z
+            backup(leaf, -z*board.player)
+    # print(board)
+    # print(board.player, [(child.q, child.n, child.w) for child in root.children])
     return root
 
-def get_pi(node, tau):
-    actions, N = zip(*[ [child.action, child.n] for child in node.children.values() ])
-    N = np.array(N)
+def get_pi(node, tau, mask):
+    N = np.array([child.n for child in node.children])
+    # print(N)
+    N *= mask
+    # print(N)
+    if tau == 0:
+        pi = np.zeros(N.shape)
+        pi[np.argmax(N)] = 1
+        return pi
     pi = N**(1/tau)
     pi /= np.sum(pi)
-    return list(actions), pi
+    return pi
 
 def self_play(storage):
     mcts_config = storage.mcts_config
@@ -103,43 +132,46 @@ def self_play(storage):
     dataset = []
     for _ in trange(mcts_config.n_games, desc='MCTS Data Collection'):
         tau = 1
+        c_puct = .5
         board = storage.board_cls()
         s_arr = []
         pi_arr = []
-        v = 0
+        v_arr = []
+        z = None
         plays = 0
-        while v == 0:
-            c_puct = 1 if plays < mcts_config.c_puct_decay_n else 1e-3
-            # ROTATIONS ARE MISSING
-            s_arr.append(board.encoded())
-            node = search(board.clone(), network, n_sim=mcts_config.n_sims_per_game_step, c_puct=c_puct, learning=True)
+        while z is None:
 
-            actions, pi = get_pi(node, tau)
+            # ROTATIONS ARE MISSING
+            node = search(board, network, n_sim=mcts_config.n_sims_per_game_step, c_puct=c_puct, add_noise=True)
+
+            pi = get_pi(node, tau, mask=board.legal_actions())
+            for b, p in board.rotations(pi):
+                s_arr.append(b)
+                pi_arr.append(p)
+                v_arr.append(board.player)
+            
             action_idx = np.random.choice(range(len(pi)),p=pi)
-            action = actions[action_idx]
-            
-            pi_temp = np.zeros(storage.board_cls.action_space)
-            legal_action_idxs = board.actions_to_idxs(actions)
-            for k in range(len(actions)):
-                pi_temp[ legal_action_idxs[actions[k]] ] = pi[k]
-            pi_arr.append(pi_temp)
-            
+            action = board.idx_action_map()[action_idx]
             board.play(action)
             plays += 1
             
-            v = board.end_state()
-        if v**2 < 1:
-            v_arr = [.5]*len(pi_arr) 
-        else:
-            v_arr = np.array( [(-1)**(k%2) for k in range(len(pi_arr))] )
-            if v == -1:
-                v_arr = -v_arr 
+            z = board.end_state()
+        
+        v_arr = z * np.array(v_arr).astype(float)
+        # if z == 0:
+        #     v_arr += .5
         dataset += list(zip(s_arr, pi_arr, v_arr))
+        # print(dataset[-2:])
     storage.save_sub_dataset(dataset)
 
-def play_learned_action(network, board, n_sim=100):
-    node = search(board.clone(), network, n_sim=100, c_puct=1e-3, learning=False)
-    actions, pi = get_pi(node, 1)
+def play_learned_action(network, board, n_sim=25, print_state=False):
+    node = search(board, network, n_sim=n_sim, c_puct=.5, add_noise=True)
+    pi = get_pi(node, tau=1, mask=board.legal_actions())
+    funky, board_value = evaluate(network, board)
+    actions = board.idx_action_map()
+    if print_state:
+        print("VALUE:", board_value)
+        print(list(zip(actions,pi,funky)))
     act_idx = np.argmax(pi)
     return actions[act_idx]
     
