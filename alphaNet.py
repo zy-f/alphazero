@@ -158,11 +158,11 @@ class NoResAlphaNet(nn.Module):
 
         self.conv_out = n_filters*9 # TIC TAC TOE ONLY
         self.fc1 = nn.Linear(self.conv_out, n_hidden)
-        self.dropout1 = nn.Dropout(.3)
+        self.dropout1 = nn.Dropout(.1)
         # relu
 
         self.fc2 = nn.Linear(n_hidden, n_hidden//2)
-        self.dropout2 = nn.Dropout(.3)
+        self.dropout2 = nn.Dropout(.1)
         # relu
 
         self.policy_head = nn.Linear(n_hidden//2, action_space)

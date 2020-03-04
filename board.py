@@ -7,7 +7,7 @@ class Board(object):
         self.player = [1,-1][len(history)%2] if history is not None else 1
         self.board = None
 
-    def play(self, action):
+    def play(self, action, in_place=True):
         pass
 
     def check_end(self):
@@ -41,14 +41,19 @@ class T3Board(Board):
         self.board = board if board is not None else np.zeros((3,3), dtype=int)
     
     # action is an (r,c) tuple
-    def play(self, action):
-        if self.board[action] == 0:
-            self.history.append(action)
-            self.board[action] = self.player
-            self.player *= -1
-            return True
-        else:
-            return False
+    def play(self, action, in_place=True):
+        action = tuple(action)
+        board = np.copy(self.board)
+        if board[action] == 0:
+            board[action] = self.player
+            if in_place:
+                self.history.append(action)
+                self.board = board
+                self.player *= -1
+                return (True, None)
+            else:
+                return (True, board)
+        return (False, None)
     
     """
     "AlphaZero is provided with perfect knowledge of the game rules. These are used during

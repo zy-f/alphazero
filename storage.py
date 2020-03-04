@@ -10,7 +10,7 @@ class Storage(object):
         self.mcts_config = mcts_config
         self.board_cls = game_class
         self.n_networks = 0
-        self.networks = []
+        self.networks = [self.net_config.weights_filepath] if self.net_config.weights_filepath is not None else []
         self.dataset = []
         self.dataset_buffer_len = buffer_len
     
@@ -47,3 +47,12 @@ class Storage(object):
             inp, pi, z = map(torch.from_numpy, (inp,pi,z))
             yield {'inputs':inp, 'pis':pi, 'zs':z}
         return
+    
+    def print_dataset_chunk(self):
+        data_idxs = np.random.randint(0,len(self.dataset),size=10)
+        print(data_idxs)
+        chunk = [self.dataset[k] for k in data_idxs]
+        for b,p,v in chunk:
+            print(b)
+            print(p)
+            print(v)

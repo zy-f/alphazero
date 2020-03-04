@@ -9,7 +9,7 @@ from tqdm import tqdm
 import os
 
 class AlphaZero:
-    def __init__(self):
+    def __init__(self, pretrained_path=None):
 
         # cleanup old files
         for dirfile in os.listdir('net_files'):
@@ -17,7 +17,7 @@ class AlphaZero:
                 os.remove(f'net_files/{dirfile}')
 
         self.game_board = board.T3Board
-        storage_buffer_len = int(5e3)
+        storage_buffer_len = int(1e5)
         
         net_params = {
             'board_layers': self.game_board.encoding_layers,
@@ -35,7 +35,7 @@ class AlphaZero:
                 'loss_cls': alphaNet.AlphaLoss, 
                 'optim_lr': 1e-3,
                 'weight_decay': 0,
-                'weights_filepath': None,
+                'weights_filepath': pretrained_path,
                 'n_epochs': 10,
                 'bsz': 64
         }
@@ -50,9 +50,8 @@ class AlphaZero:
         self.storage = Storage(net_config, mcts_config, self.game_board, buffer_len=storage_buffer_len)
 
         self.n_display_games = 2
-        
 
-    def alpha_zero(self):
+    def run_alpha_zero(self):
         net = self.storage.latest_network()
         self.storage.save_network(net)
         print(net)
@@ -87,15 +86,19 @@ class AlphaZero:
         game_board = self.game_board()
         turn = 0
         while game_board.end_state() is None:
-            action = mcts.play_learned_action(networks[turn%2], game_board, n_sim=25, print_state=print_game)
+            action = mcts.play_learned_action(networks[turn%2], game_board, n_sim=self.storage.mcts_config.n_sims_per_game_step, print_state=print_game)
             game_board.play(action)
             if print_game:
                 print(game_board)
         return game_board.end_state()
+    
+    def play_vs_human()
+    
+
 
 
 if __name__ == '__main__':
     az = AlphaZero()
-    final_net = az.alpha_zero()
+    final_net = az.run_alpha_zero()
     save_file = input('Save as? (ctrl-c to quit without saving) ')
     torch.save(final_net.net.state_dict(), f'net_files/final/{save_file}.pth')
