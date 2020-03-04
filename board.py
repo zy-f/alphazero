@@ -42,18 +42,21 @@ class T3Board(Board):
     
     # action is an (r,c) tuple
     def play(self, action, in_place=True):
-        action = tuple(action)
-        board = np.copy(self.board)
-        if board[action] == 0:
-            board[action] = self.player
-            if in_place:
-                self.history.append(action)
-                self.board = board
-                self.player *= -1
-                return (True, None)
-            else:
-                return (True, board)
-        return (False, None)
+        try:
+            action = tuple(action)
+            board = np.copy(self.board)
+            if board[action] == 0:
+                board[action] = self.player
+                if in_place:
+                    self.history.append(action)
+                    self.board = board
+                    self.player *= -1
+                    return (True, None)
+                else:
+                    return (True, board)
+            return (False, None)
+        except:
+            return (False, None)
     
     """
     "AlphaZero is provided with perfect knowledge of the game rules. These are used during

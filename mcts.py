@@ -78,15 +78,15 @@ def evaluate(network, board):
 def backup(leaf, action_path, v):
     node = leaf
     for act in action_path[::-1]:
+        v *= -1
         edge = node.in_edges[act]
         edge.update(v)
-        # print(node)
-        v *= -1
+        # print(edge)
         node = edge.parent_node
 
 def add_dirichlet_noise(node):
     child_ps = np.array([edge.p for edge in node.out_edges])
-    noise_distrib = np.random.gamma(.03, 1, len(node.out_edges))
+    noise_distrib = np.random.gamma(.1, 1, len(node.out_edges))
     child_ps = .75*child_ps + .25*noise_distrib
     for k, child_p in enumerate(child_ps):
         node.out_edges[k].p = child_p
@@ -119,7 +119,8 @@ def search(board, network, n_sim=100, c_puct=1, add_noise=True, verbose=False):
         pi, v = evaluate(network, temp_board) # evaluate
 
         action_ps = pi * temp_board.legal_actions()
-        if sum(action_ps) > 0:
+        z = temp_board.end_state()
+        if sum(action_ps) > 0 and z is None:
             action_ps /= sum(action_ps)
             child_nodes, known_states = get_child_nodes(temp_board, board.idx_action_map(), known_states)
             edge_params = list(zip(action_ps, board.idx_action_map(), child_nodes))
@@ -127,10 +128,9 @@ def search(board, network, n_sim=100, c_puct=1, add_noise=True, verbose=False):
             if add_noise and len(search_path) < 1:
                 root = add_dirichlet_noise(root)
                 add_noise = False
-            backup(leaf, search_path, -v) # backup
-        else:
-            z = temp_board.end_state()
-            backup(leaf, search_path, -z*board.player)
+            backup(leaf, search_path, v) # backup
+        elif z is not None:
+            backup(leaf, search_path, z*temp_board.player)
     if verbose:
         print(root)
     return root
@@ -164,7 +164,7 @@ def self_play(storage):
         while z is None:
 
             # ROTATIONS ARE MISSING
-            node = search(board, network, n_sim=mcts_config.n_sims_per_game_step, c_puct=c_puct, add_noise=True, verbose=(plays>5))
+            node = search(board, network, n_sim=mcts_config.n_sims_per_game_step, c_puct=c_puct, add_noise=True, verbose=False)#(plays>5))
 
             actions, pi = get_pi(node, tau)
             for b, p in board.rotations(pi):
@@ -186,7 +186,7 @@ def self_play(storage):
     storage.save_sub_dataset(dataset)
     # storage.print_dataset_chunk()
 
-def play_learned_action(network, board, n_sim=25, print_state=False):
+def get_learned_action(network, board, n_sim=25, print_state=False):
     node = search(board, network, n_sim=n_sim, c_puct=1, add_noise=True, verbose=print_state)
     actions, pi = get_pi(node, tau=1)
     funky, board_value = evaluate(network, board)

@@ -11,11 +11,6 @@ import os
 class AlphaZero:
     def __init__(self, pretrained_path=None):
 
-        # cleanup old files
-        for dirfile in os.listdir('net_files'):
-            if "temp" in dirfile:
-                os.remove(f'net_files/{dirfile}')
-
         self.game_board = board.T3Board
         storage_buffer_len = int(1e5)
         
@@ -23,8 +18,8 @@ class AlphaZero:
             'board_layers': self.game_board.encoding_layers,
             'board_size': self.game_board.board_size,
             'action_space': self.game_board.action_space,
-            'n_filters': 64, #64
-            'n_hidden': 64, #64
+            'n_filters': 128, #64
+            'n_hidden': 128, #64
             # 'n_conv': 4
             'n_res': 2
         }
@@ -50,8 +45,15 @@ class AlphaZero:
         self.storage = Storage(net_config, mcts_config, self.game_board, buffer_len=storage_buffer_len)
 
         self.n_display_games = 2
+        self.n_compare_games = 10
+        self.save_cutoff = .5
 
     def run_alpha_zero(self):
+        # cleanup old files
+        for dirfile in os.listdir('net_files'):
+            if "temp" in dirfile:
+                os.remove(f'net_files/{dirfile}')
+        
         net = self.storage.latest_network()
         self.storage.save_network(net)
         print(net)
@@ -73,29 +75,29 @@ class AlphaZero:
                 return self.storage.latest_network()
 
     # networks = [old_net, new_net]
-    def compare_networks(self, networks, games=10):
+    def compare_networks(self, networks):
         new_wins = []
-        for k in tqdm(range(games), desc='Comparing Networks'):
+        for k in tqdm(range(self.n_compare_games), desc='Comparing Networks'):
             turn_winner = self.self_play_game(networks[::(-1)**k], print_game=(k==0))
             # 1 point to new net for winning, .5 points for draw, 0 points for losing
             new_wins.append( [.5, 0, 1][ turn_winner*((-1)**k) ] )
-        print(f"Results: {new_wins}\nNew winrate: {sum(new_wins)/games}") 
-        return sum(new_wins)/games >= .55
+        print(f"Results: {new_wins}\nNew winrate: {sum(new_wins)/self.n_compare_games}") 
+        return sum(new_wins)/self.n_compare_games >= self.save_cutoff
 
     def self_play_game(self, networks, print_game=False):
         game_board = self.game_board()
         turn = 0
         while game_board.end_state() is None:
-            action = mcts.play_learned_action(networks[turn%2], game_board, n_sim=self.storage.mcts_config.n_sims_per_game_step, print_state=print_game)
+            action = mcts.get_learned_action(networks[turn%2], game_board, n_sim=self.storage.mcts_config.n_sims_per_game_step, print_state=print_game)
             game_board.play(action)
             if print_game:
                 print(game_board)
         return game_board.end_state()
     
-    def play_vs_human()
-    
-
-
+    def play_vs_human(self, board, print_thinking=False):
+        if not hasattr(self, 'final_net'):
+            self.final_network = self.storage.latest_network()
+        return mcts.get_learned_action(self.final_network, board, n_sim=self.storage.mcts_config.n_sims_per_game_step, print_state=print_thinking)
 
 if __name__ == '__main__':
     az = AlphaZero()
