@@ -1,8 +1,8 @@
 # alphazero
-personal implementation of DeepMind's AlphaZero 
+Personal implementation of DeepMind's AlphaZero in Pytorch
 
-developed for tictactoe
-development for connect 4 planned
+- developed for tictactoe
+- development for connect 4 planned
 
 To train and play:
 1) Install library requirements (via `pip3 install -r requirements.txt`)
@@ -21,8 +21,8 @@ net_params = {
     'board_layers': self.game_board.encoding_layers,
     'board_size': self.game_board.board_size,
     'action_space': self.game_board.action_space,
-    'n_filters': 128, #64
-    'n_hidden': 128, #64
+    'n_filters': 128,
+    'n_hidden': 128,
     'n_res': 2
 }
 
