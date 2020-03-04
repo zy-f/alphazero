@@ -10,7 +10,7 @@ class Board(object):
     def play(self, action, in_place=True):
         pass
 
-    def check_end(self):
+    def end_state(self):
         pass
 
     def encoded(self):
@@ -18,11 +18,8 @@ class Board(object):
 
     def legal_actions(self):
         pass
-
-    def actions_to_idxs(self, actions):
-        pass
     
-    def idxs_to_actions(self, idxs):
+    def idx_action_map(self):
         pass
 
     def clone(self):

@@ -1,9 +1,10 @@
 from alphaZero import AlphaZero
 from board import T3Board
+import argparse
 
 def play_t3(opponent_network):
     print("===Tic-tac-toe VS AlphaZero===")
-    az = AlphaZero(pretrained_path=opponent_network)
+    az = AlphaZero(pretrained_path=f'net_files/final/{opponent_network}.pth')
     replay = True
 
     while replay:
@@ -15,6 +16,8 @@ def play_t3(opponent_network):
             except:
                 if 'q' in str(player_turn):
                     return
+                else:
+                    print("Type 'q' to quit")
         print(f"Player is {['O','X'][player_turn-1]}")
         player_turn = [1,-1][player_turn-1] # 1 = first, -1 = second
         
@@ -30,11 +33,13 @@ def play_t3(opponent_network):
                     except:
                         if 'q' in str(action):
                             return
+                        else:
+                            print("Type 'q' to quit")
             else:
-                board.play(az.play_vs_human(board, print_thinking=True))
+                board.play(az.play_vs_human(board, print_thinking=False))
         print(board)
         replay = 'y' in input("Play again? ")
 
 
 if __name__ == '__main__':
-    play_t3(opponent_network='net_files/final/goodNet.pth')
+    play_t3(opponent_network='goodNet_t3')

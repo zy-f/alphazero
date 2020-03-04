@@ -18,7 +18,7 @@ class Network(object):
         except:
             pass
     
-    # runs 1 epoch of training
+    # runs epochs of training
     def train_epochs(self, storage):
         if len(storage.dataset) < storage.net_config.bsz:
             return

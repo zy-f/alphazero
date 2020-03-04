@@ -18,7 +18,6 @@ class Node(object):
     
     def expand(self, edge_params):
         for p, action, child_node in edge_params:
-            # print(f"action={action}, p={p}")
             self.out_edges.append( Edge(parent_node=self, action=action, child_node=child_node, p=p) ) 
         self.is_expanded = True
     
@@ -51,11 +50,8 @@ class Edge(object):
         return f"{self.action} => n={self.n}, q={self.q}, p={self.p}"
 
 def select_child(node, c_puct=1):
-        # print(node)
         N, Q, P = map( np.array, zip(*[ [edge.n, edge.q, edge.p] for edge in node.out_edges ]) )
-        # print(P)
         U = c_puct * P * np.sqrt(np.sum(N)) / (1+N)
-        # print(f"Q={Q}\nU={U}\nQ+U={Q+U}")
         best_edge = node.out_edges[np.argmax(Q+U)]
         return best_edge.child_node, best_edge.action
 
@@ -64,7 +60,6 @@ def select_leaf(root, c_puct):
     search_path = []
     while node.is_expanded:
         node, action = select_child(node, c_puct=c_puct)
-        # print(node)
         search_path.append(action)
     return node, search_path
 
@@ -81,7 +76,6 @@ def backup(leaf, action_path, v):
         v *= -1
         edge = node.in_edges[act]
         edge.update(v)
-        # print(edge)
         node = edge.parent_node
 
 def add_dirichlet_noise(node):
@@ -110,12 +104,9 @@ def search(board, network, n_sim=100, c_puct=1, add_noise=True, verbose=False):
     known_states = {repr(board.board.tolist()): root}
     for _ in range(n_sim):
         temp_board = board.clone()
-        # print("SELECT")
         leaf, search_path = select_leaf(root, c_puct) # select
         for act in search_path:
             temp_board.play(act)
-        # print(temp_board)
-        # print("EVAL")
         pi, v = evaluate(network, temp_board) # evaluate
 
         action_ps = pi * temp_board.legal_actions()
@@ -138,14 +129,15 @@ def search(board, network, n_sim=100, c_puct=1, add_noise=True, verbose=False):
 def get_pi(node, tau):
     N = np.array([edge.n for edge in node.out_edges])
     actions = [edge.action for edge in node.out_edges]
-    # print(N)
+    
     if tau == 0:
         pi = np.zeros(N.shape)
         pi[np.argmax(N)] = 1
         return actions, pi
+    
     pi = N**(1/tau)
     pi /= np.sum(pi)
-    # print(list(zip(actions, pi)))
+    
     return actions, pi
 
 def self_play(storage):
@@ -163,9 +155,9 @@ def self_play(storage):
         plays = 0
         while z is None:
 
-            # ROTATIONS ARE MISSING
             node = search(board, network, n_sim=mcts_config.n_sims_per_game_step, c_puct=c_puct, add_noise=True, verbose=False)#(plays>5))
 
+            # rotations
             actions, pi = get_pi(node, tau)
             for b, p in board.rotations(pi):
                 s_arr.append(b)
@@ -180,18 +172,17 @@ def self_play(storage):
             z = board.end_state()
         
         v_arr = z * np.array(v_arr).astype(float)
-        # if z == 0:
-        #     v_arr += .5
+
         dataset += list(zip(s_arr, pi_arr, v_arr))
     storage.save_sub_dataset(dataset)
-    # storage.print_dataset_chunk()
 
 def get_learned_action(network, board, n_sim=25, print_state=False):
     node = search(board, network, n_sim=n_sim, c_puct=1, add_noise=True, verbose=print_state)
     actions, pi = get_pi(node, tau=1)
-    funky, board_value = evaluate(network, board)
+    net_pi, board_value = evaluate(network, board)
     if print_state:
         print("VALUE:", board_value)
-        print(list(zip(actions,pi,funky)))
+        print("(Move, mcts move confidence, net move confidence)")
+        print(list(zip(actions,pi,net_pi)))
     act_idx = np.argmax(pi)
     return actions[act_idx]
