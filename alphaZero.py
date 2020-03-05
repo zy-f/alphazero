@@ -11,15 +11,15 @@ import os
 class AlphaZero:
     def __init__(self, pretrained_path=None):
 
-        self.game_board = board.T3Board
+        self.game_board = board.C4Board
         storage_buffer_len = int(1e5)
         
         net_params = {
             'board_layers': self.game_board.encoding_layers,
             'board_size': self.game_board.board_size,
             'action_space': self.game_board.action_space,
-            'n_filters': 128, #64
-            'n_hidden': 128, #64
+            'n_filters': 256, #64
+            'n_hidden': 256, #64
             'n_res': 2
         }
 
@@ -31,13 +31,15 @@ class AlphaZero:
                 'weight_decay': 0,
                 'weights_filepath': pretrained_path,
                 'n_epochs': 10,
-                'bsz': 64,
+                'bsz': 32,
                 'save_cutoff': .5
         }
 
         mcts_kwargs = {
-            'n_games': 5,
+            'n_games': 10,
             'n_sims_per_game_step': 25,
+            'temp_threshold': 10,
+            'dirichlet_noise_alpha': .15,
             'verbose': True
         }
 
@@ -78,7 +80,7 @@ class AlphaZero:
     def compare_networks(self, networks):
         new_wins = []
         for k in tqdm(range(self.n_compare_games), desc='Comparing Networks'):
-            turn_winner = self.self_play_game(networks[::(-1)**k], print_game=False)
+            turn_winner = self.self_play_game(networks[::(-1)**k], print_game=(k==0))
             # 1 point to new net for winning, .5 points for draw, 0 points for losing
             new_wins.append( [.5, 0, 1][ turn_winner*((-1)**k) ] )
         print(f"Results: {new_wins}\nNew winrate: {sum(new_wins)/self.n_compare_games}") 

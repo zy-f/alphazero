@@ -2,7 +2,11 @@ import numpy as np
 from copy import deepcopy
 
 class Board(object):
-    def __init__(self, history):
+    action_space = 0
+    board_size = 0
+    encoding_layers = 1
+
+    def __init__(self, history=None):
         self.history = history or []
         self.player = [1,-1][len(history)%2] if history is not None else 1
         self.board = None
@@ -23,9 +27,9 @@ class Board(object):
         pass
 
     def clone(self):
-        pass
+        return self.__class__(history=list(self.history), board=np.copy(self.board))
     
-    def rotations(self):
+    def symmetries(self, pi):
         pass
 
 class T3Board(Board):
@@ -34,7 +38,7 @@ class T3Board(Board):
     encoding_layers = 1
 
     def __init__(self, history=None, board=None):
-        super(T3Board,self).__init__(history)
+        super(T3Board,self).__init__(history=history)
         self.board = board if board is not None else np.zeros((3,3), dtype=int)
     
     # action is an (r,c) tuple
@@ -55,11 +59,7 @@ class T3Board(Board):
         except:
             return (False, None)
     
-    """
-    "AlphaZero is provided with perfect knowledge of the game rules. These are used during
-    MCTS, to simulate the positions resulting from a sequence of moves, to determine game
-    termination, and to score any simulations that reach a terminal state." (AlphaZero 14)
-    """
+    # checks absolute end state (None=game not ended, 0=draw, 1=player 1 win, -1=player 2 win)
     def end_state(self):
         # horizontal/vertical checking
         if (np.sum(self.board,axis=0)**2 == 9).any() or (np.sum(self.board,axis=1)**2 == 9).any():
@@ -74,33 +74,12 @@ class T3Board(Board):
             return 0
         return None
 
-    """
-    "The M feature planes are composed of binary feature planes indicating the presence of the player’s pieces, 
-    with one plane for each piece type, and a second set of planes indicating the presence of the opponent’s 
-    pieces...There are an additional L constant-valued input planes denoting the player’s colour, the move
-    number, and the state of special rules..." (AlphaZero 14-15)
-    """
-    """
-    AlphaZero and AlphaGo Zero discuss the importance of including past board states in the network input.
-    However, this is because repetitions are illegal/otherwise relevant in Go/Chess/Shogi, whereas tictactoe
-    is "fully observable soley from the current [board state]" (AlphaGo supplement)
-    """
     def encoded(self):
         encoded = np.zeros((self.__class__.encoding_layers,3,3), dtype=np.float32)
-        # M planes
-        # encoded[:,:,0] = (self.board==1) # O's
-        # encoded[:,:,1] = (self.board==-1) # X's
-        
-        # encoded[0,:,:] = (self.board == self.player)
-        # encoded[1,:,:] = (self.board == -self.player)
-        
         encoded[0,:,:] = self.board*self.player
-
-        # L planes
-        # encoded[2,:,:] = self.player # current player (L1)
         return encoded
     
-    def rotations(self, pi):
+    def symmetries(self, pi):
         board = self.encoded()
         pi = pi.reshape(3,3)
         stack = np.insert(board,1,pi,axis=0)
@@ -119,9 +98,88 @@ class T3Board(Board):
         mapping = [(k//3, k%3) for k in range(self.__class__.action_space)]
         return mapping
 
-    def clone(self):
-        return T3Board(history=list(self.history), board=np.copy(self.board))
+    def __str__(self):
+        str_player = ['X','O'][int(self.player/2+.5)]
+        str_board = self.board.astype(str)
+        str_board = '\n'.join(['|'.join(str_board[k]) for k in range(len(str_board))])
+        str_board = str_board.replace('-1','X').replace('1','O').replace('0',' ')
+        is_won = self.end_state()
+        if is_won is None:
+            return f"\n{str_board}\n{str_player}'s turn"
+        out_state_string = ['Draw','Player O Wins','Player X Wins'][int(is_won)]
+        return f"\n{str_board}\n{out_state_string}"
 
+
+class C4Board(Board):
+    action_space = 7
+    board_size = 42
+    encoding_layers = 1
+
+    def __init__(self, history=None, board=None):
+        super(C4Board,self).__init__(history=history)
+        self.board = board if board is not None else np.zeros((6,7), dtype=int)
+
+    # action is an int from 0-6
+    def play(self, action, in_place=True):
+        try:
+            board = np.copy(self.board)
+            if (board[:,action]==0).any():
+                lowest_dex = 0
+                for k in range(6):
+                    if board[k,action] != 0:
+                        break
+                    lowest_dex = k
+                board[lowest_dex, action] = self.player
+                if in_place:
+                    self.history.append(action)
+                    self.board = board
+                    self.player *= -1
+                    return (True, None)
+                else:
+                    return (True, board)
+            return (False, None)
+        except:
+            return (False, None)
+
+    def end_state(self):
+        lines = []
+        # rows
+        lines += [self.board[k,:] for k in range(self.board.shape[0])]
+        # columns
+        lines += [self.board[:,k] for k in range(self.board.shape[1])]
+        # forward diagonals \
+        lines += [np.diagonal(self.board, offset=k) for k in range(-2, 4)]
+        # back diagonals /
+        lines += [np.diagonal(np.fliplr(self.board), offset=k) for k in range(-2, 4)]
+        for line in lines:
+            if np.sum(line==1)<4 and np.sum(line==-1)<4:
+                continue
+            repeats=0
+            for k in range(1,len(line)):
+                if line[k] == line[k-1]:
+                    repeats += 1
+                    if repeats > 2:
+                        return line[k]
+                else:
+                    repeats=0
+        if not (self.board==0).any():
+            return 0
+        return None
+
+    def encoded(self):
+        encoded = np.zeros((self.__class__.encoding_layers,6,7), dtype=np.float32)
+        encoded[0,:,:] = self.board*self.player
+        return encoded
+
+    def legal_actions(self):
+        return (self.board==0).any(axis=0)
+    
+    def idx_action_map(self):
+        return range(7)
+    
+    def symmetries(self, pi):
+        return [(self.encoded(), pi), (np.flip(self.encoded(), axis=-1), np.flip(pi))]
+    
     def __str__(self):
         str_player = ['X','O'][int(self.player/2+.5)]
         str_board = self.board.astype(str)

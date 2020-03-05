@@ -28,7 +28,7 @@ class Node(object):
 class Edge(object):
     def __init__(self, parent_node, action, child_node, p=0):
         self.parent_node = parent_node
-        self.action = tuple(action)
+        self.action = action
         self.child_node = child_node
         self.n = 0
         self.w = 0
@@ -80,7 +80,7 @@ def backup(leaf, action_path, v):
 
 def add_dirichlet_noise(node):
     child_ps = np.array([edge.p for edge in node.out_edges])
-    noise_distrib = np.random.gamma(.1, 1, len(node.out_edges))
+    noise_distrib = np.random.gamma(.18, 1, len(node.out_edges))
     child_ps = .75*child_ps + .25*noise_distrib
     for k, child_p in enumerate(child_ps):
         node.out_edges[k].p = child_p
@@ -99,7 +99,7 @@ def get_child_nodes(board, actions, known_states):
             out.append(None)
     return out, known_states 
 
-def search(board, network, n_sim=100, c_puct=1, add_noise=True, verbose=False):
+def search(board, network, n_sim=100, c_puct=1, noise=.03, verbose=False):
     root = Node(state=board.board)
     known_states = {repr(board.board.tolist()): root}
     for _ in range(n_sim):
@@ -116,9 +116,9 @@ def search(board, network, n_sim=100, c_puct=1, add_noise=True, verbose=False):
             child_nodes, known_states = get_child_nodes(temp_board, board.idx_action_map(), known_states)
             edge_params = list(zip(action_ps, board.idx_action_map(), child_nodes))
             leaf.expand(edge_params) # expand
-            if add_noise and len(search_path) < 1:
+            if noise > 0 and len(search_path) < 1:
                 root = add_dirichlet_noise(root)
-                add_noise = False
+                noise = 0
             backup(leaf, search_path, v) # backup
         elif z is not None:
             backup(leaf, search_path, z*temp_board.player)
@@ -154,12 +154,14 @@ def self_play(storage):
         z = None
         plays = 0
         while z is None:
+            if plays >= mcts_config.temp_threshold:
+                tau = 0
 
-            node = search(board, network, n_sim=mcts_config.n_sims_per_game_step, c_puct=c_puct, add_noise=True, verbose=False)#(plays>5))
+            node = search(board, network, n_sim=mcts_config.n_sims_per_game_step, c_puct=c_puct, noise=mcts_config.dirichlet_noise_alpha, verbose=False)#(plays>5))
 
-            # rotations
+            # symmetries
             actions, pi = get_pi(node, tau)
-            for b, p in board.rotations(pi):
+            for b, p in board.symmetries(pi):
                 s_arr.append(b)
                 pi_arr.append(p)
                 v_arr.append(board.player)
@@ -177,7 +179,7 @@ def self_play(storage):
     storage.save_sub_dataset(dataset)
 
 def get_learned_action(network, board, n_sim=25, print_state=False):
-    node = search(board, network, n_sim=n_sim, c_puct=1, add_noise=True, verbose=print_state)
+    node = search(board, network, n_sim=n_sim, c_puct=1, noise=0, verbose=print_state)
     actions, pi = get_pi(node, tau=1)
     net_pi, board_value = evaluate(network, board)
     if print_state:

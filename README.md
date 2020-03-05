@@ -41,6 +41,8 @@ net_kwargs = {
 mcts_kwargs = {
     'n_games': 5,
     'n_sims_per_game_step': 25,
+    'temp_threshold': 9,
+    'dirichlet_noise_alpha': .15,
     'verbose': True
 }
 ```
