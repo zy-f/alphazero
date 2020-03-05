@@ -31,15 +31,15 @@ class AlphaZero:
                 'weight_decay': 0,
                 'weights_filepath': pretrained_path,
                 'n_epochs': 10,
-                'bsz': 64,
+                'bsz': 32,
                 'save_cutoff': .501
         }
 
         mcts_kwargs = {
             'n_games': 5,
             'n_sims_per_game_step': 30,
-            'temp_threshold': 25,
-            'dirichlet_noise_alpha': .2,
+            'temp_threshold': 20,
+            'dirichlet_noise_alpha': .08,
             'verbose': True
         }
 
@@ -80,7 +80,7 @@ class AlphaZero:
     def compare_networks(self, networks):
         new_wins = []
         for k in tqdm(range(self.n_compare_games), desc='Comparing Networks'):
-            turn_winner = self.self_play_game(networks[::(-1)**k], print_game=(k==0))
+            turn_winner = self.self_play_game(networks[::(-1)**k], print_game=(k%2==0 and k<4))
             # 1 point to new net for winning, .5 points for draw, 0 points for losing
             new_wins.append( [.5, 0, 1][ turn_winner*((-1)**k) ] )
         print(f"Results: {new_wins}\nNew winrate: {sum(new_wins)/self.n_compare_games}") 

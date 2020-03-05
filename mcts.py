@@ -78,9 +78,9 @@ def backup(leaf, action_path, v):
         edge.update(v)
         node = edge.parent_node
 
-def add_dirichlet_noise(node):
+def add_dirichlet_noise(node, noise):
     child_ps = np.array([edge.p for edge in node.out_edges])
-    noise_distrib = np.random.gamma(.18, 1, len(node.out_edges))
+    noise_distrib = np.random.gamma(noise, 1, len(node.out_edges))
     child_ps = .75*child_ps + .25*noise_distrib
     for k, child_p in enumerate(child_ps):
         node.out_edges[k].p = child_p
@@ -117,7 +117,7 @@ def search(board, network, n_sim=100, c_puct=1, noise=.03, verbose=False):
             edge_params = list(zip(action_ps, board.idx_action_map(), child_nodes))
             leaf.expand(edge_params) # expand
             if noise > 0 and len(search_path) < 1:
-                root = add_dirichlet_noise(root)
+                root = add_dirichlet_noise(root, noise)
                 noise = 0
             backup(leaf, search_path, v) # backup
         elif z is not None:
@@ -179,7 +179,7 @@ def self_play(storage):
     storage.save_sub_dataset(dataset)
 
 def get_learned_action(network, board, n_sim=25, noise=.03, print_state=False):
-    node = search(board, network, n_sim=n_sim, c_puct=1, noise=0, verbose=print_state)
+    node = search(board, network, n_sim=n_sim, c_puct=1, noise=noise, verbose=print_state)
     actions, pi = get_pi(node, tau=1)
     net_pi, board_value = evaluate(network, board)
     if print_state:
