@@ -56,7 +56,7 @@ def play_c4(opponent_network):
                     return
                 else:
                     print("Type 'q' to quit")
-        print(f"Player is {['O','X'][player_turn-1]}")
+        print(f"Player is {['o','+'][player_turn-1]}")
         player_turn = [1,-1][player_turn-1] # 1 = first, -1 = second
         
         board = C4Board()

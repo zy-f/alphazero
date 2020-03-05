@@ -18,9 +18,9 @@ class AlphaZero:
             'board_layers': self.game_board.encoding_layers,
             'board_size': self.game_board.board_size,
             'action_space': self.game_board.action_space,
-            'n_filters': 256, #64
-            'n_hidden': 256, #64
-            'n_res': 2
+            'n_filters': 128, #64
+            'n_hidden': 128, #64
+            'n_res': 3
         }
 
         net_kwargs = {
@@ -31,15 +31,15 @@ class AlphaZero:
                 'weight_decay': 0,
                 'weights_filepath': pretrained_path,
                 'n_epochs': 10,
-                'bsz': 32,
-                'save_cutoff': .5
+                'bsz': 64,
+                'save_cutoff': .501
         }
 
         mcts_kwargs = {
-            'n_games': 10,
-            'n_sims_per_game_step': 25,
-            'temp_threshold': 10,
-            'dirichlet_noise_alpha': .15,
+            'n_games': 5,
+            'n_sims_per_game_step': 30,
+            'temp_threshold': 25,
+            'dirichlet_noise_alpha': .2,
             'verbose': True
         }
 
@@ -90,7 +90,7 @@ class AlphaZero:
         game_board = self.game_board()
         turn = 0
         while game_board.end_state() is None:
-            action = mcts.get_learned_action(networks[turn%2], game_board, n_sim=self.storage.mcts_config.n_sims_per_game_step, print_state=(print_game and self.storage.mcts_config.verbose))
+            action = mcts.get_learned_action(networks[turn%2], game_board, n_sim=self.storage.mcts_config.n_sims_per_game_step, noise=self.storage.mcts_config.dirichlet_noise_alpha, print_state=(print_game and self.storage.mcts_config.verbose))
             game_board.play(action)
             if print_game:
                 print(game_board)
@@ -99,7 +99,7 @@ class AlphaZero:
     def play_vs_human(self, board, print_thinking=False):
         if not hasattr(self, 'final_net'):
             self.final_network = self.storage.latest_network()
-        return mcts.get_learned_action(self.final_network, board, n_sim=self.storage.mcts_config.n_sims_per_game_step, print_state=print_thinking)
+        return mcts.get_learned_action(self.final_network, board, n_sim=self.storage.mcts_config.n_sims_per_game_step, noise=self.storage.mcts_config.dirichlet_noise_alpha, print_state=print_thinking)
 
 if __name__ == '__main__':
     az = AlphaZero()

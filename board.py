@@ -181,12 +181,12 @@ class C4Board(Board):
         return [(self.encoded(), pi), (np.flip(self.encoded(), axis=-1), np.flip(pi))]
     
     def __str__(self):
-        str_player = ['X','O'][int(self.player/2+.5)]
+        str_player = ['+','o'][int(self.player/2+.5)]
         str_board = self.board.astype(str)
         str_board = '\n'.join(['|'.join(str_board[k]) for k in range(len(str_board))])
-        str_board = str_board.replace('-1','X').replace('1','O').replace('0',' ')
+        str_board = str_board.replace('-1','+').replace('1','o').replace('0',' ')
         is_won = self.end_state()
         if is_won is None:
             return f"\n{str_board}\n{str_player}'s turn"
-        out_state_string = ['Draw','Player O Wins','Player X Wins'][int(is_won)]
+        out_state_string = ['Draw','Player o Wins','Player + Wins'][int(is_won)]
         return f"\n{str_board}\n{out_state_string}"

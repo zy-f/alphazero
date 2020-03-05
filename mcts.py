@@ -178,7 +178,7 @@ def self_play(storage):
         dataset += list(zip(s_arr, pi_arr, v_arr))
     storage.save_sub_dataset(dataset)
 
-def get_learned_action(network, board, n_sim=25, print_state=False):
+def get_learned_action(network, board, n_sim=25, noise=.03, print_state=False):
     node = search(board, network, n_sim=n_sim, c_puct=1, noise=0, verbose=print_state)
     actions, pi = get_pi(node, tau=1)
     net_pi, board_value = evaluate(network, board)
