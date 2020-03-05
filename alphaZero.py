@@ -12,15 +12,15 @@ class AlphaZero:
     def __init__(self, pretrained_path=None):
 
         self.game_board = board.C4Board
-        storage_buffer_len = int(1e5)
+        storage_buffer_len = int(1e4)
         
         net_params = {
             'board_layers': self.game_board.encoding_layers,
             'board_size': self.game_board.board_size,
             'action_space': self.game_board.action_space,
-            'n_filters': 128, #64
-            'n_hidden': 128, #64
-            'n_res': 3
+            'n_filters': 64, #64
+            'n_hidden': 64, #64
+            'n_res': 5
         }
 
         net_kwargs = {
@@ -31,15 +31,15 @@ class AlphaZero:
                 'weight_decay': 0,
                 'weights_filepath': pretrained_path,
                 'n_epochs': 10,
-                'bsz': 32,
+                'bsz': 64,
                 'save_cutoff': .501
         }
 
         mcts_kwargs = {
             'n_games': 5,
             'n_sims_per_game_step': 30,
-            'temp_threshold': 20,
-            'dirichlet_noise_alpha': .08,
+            'temp_threshold': 25,
+            'dirichlet_noise_alpha': .15,
             'verbose': True
         }
 
